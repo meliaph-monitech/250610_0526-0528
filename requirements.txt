@@ -1,8 +1,5 @@
-
-flask
+streamlit
 pandas
-numpy
-scipy
+seaborn
 matplotlib
-msgpack
-requests
+plotly
