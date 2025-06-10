@@ -35,6 +35,11 @@ if uploaded_file:
         df_all = pd.concat(data_frames, ignore_index=True)
         df_all.dropna(subset=["Timestamp"], inplace=True)
 
+        # Force categorical time labels to prevent Plotly from misinterpreting
+        df_all["Timestamp"] = df_all["Timestamp"].astype(str)
+        unique_times_sorted = sorted(df_all["Timestamp"].unique())
+        df_all["Timestamp"] = pd.Categorical(df_all["Timestamp"], categories=unique_times_sorted, ordered=True)
+
         st.subheader("📌 전처리된 통합 데이터")
         st.write(f"총 {len(df_all)}개의 데이터가 통합되었습니다.")
         st.dataframe(df_all.head(10))
