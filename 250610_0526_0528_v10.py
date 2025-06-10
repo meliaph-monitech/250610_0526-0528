@@ -31,41 +31,24 @@ def format_excel_time(t):
 
 # Sidebar
 st.sidebar.header("🧭 대시보드 설정\n\nSensor Data Dashboard Settings")
-
-# Initialize session state to track sample data usage
-if "use_sample" not in st.session_state:
-    st.session_state.use_sample = False
-
-# File uploader
 uploaded_file = st.sidebar.file_uploader("엑셀 파일 업로드 (.xlsx)\n\nUpload Excel File", type=["xlsx"])
 
-# Button to use sample data
-if st.sidebar.button("📂 샘플 데이터 사용\n\nUse Sample Data"):
-    st.session_state.use_sample = True
-
-# Use uploaded file if available, else sample if chosen
-xls = None
-
-if uploaded_file is not None:
+# Determine source
+if uploaded_file:
     xls = pd.ExcelFile(uploaded_file)
-    st.session_state.use_sample = False  # override if file is uploaded
     st.sidebar.success("✅ 사용자 업로드 데이터를 사용 중입니다.\n\nUsing user-uploaded data.")
-
-elif st.session_state.use_sample:
+else:
     try:
-        default_url = "https://raw.githubusercontent.com/meliaph-monitech/250610_0526-0528/main/250610_sampledata.xlsx"
-        response = requests.get(default_url)
+        sample_url = "https://raw.githubusercontent.com/meliaph-monitech/250610_0526-0528/main/250610_sampledata.xlsx"
+        response = requests.get(sample_url)
         response.raise_for_status()
         xls = pd.ExcelFile(BytesIO(response.content))
-        st.sidebar.info("📁 샘플 데이터를 사용 중입니다.\n\nUsing default sample data.")
+        st.sidebar.info("📁 샘플 데이터를 자동으로 불러왔습니다.\n\nUsing default sample data.")
     except Exception as e:
-        st.error(f"❌ 샘플 파일을 불러올 수 없습니다.\n\nCould not load sample data.\n\nError: {e}")
+        st.error(f"❌ 샘플 데이터를 불러올 수 없습니다.\n\nCould not load sample data.\n\nError: {e}")
         st.stop()
-else:
-    st.warning("📤 엑셀 파일을 업로드하거나 샘플 데이터를 선택해주세요.\n\nPlease upload an Excel file or click 'Use Sample Data'.")
-    st.stop()
-    
-# Proceed only if xls was successfully defined
+
+# Sheet selection and parsing
 all_sheets = xls.sheet_names
 selected_sheets = st.sidebar.multiselect("시트 선택:\n\nSelect Sheets", all_sheets, default=all_sheets[:3])
 
