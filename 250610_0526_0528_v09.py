@@ -187,6 +187,7 @@ if uploaded_file:
 
         # --- Diagnostic Metrics Summary
         # Additional Metrics Section: Global + Per-Sheet Diagnostics
+        
         st.markdown("## 🧮 진단 지표 분석<br><span style='color:gray'>Diagnostic Metrics Summary</span>", unsafe_allow_html=True)
         
         # Global Diagnostics
@@ -242,7 +243,9 @@ if uploaded_file:
                     fill='toself',
                     name=row["Sheet"]
                 ))
-            fig.update_layout(polar=dict(radialaxis=dict(visible=True)),
+            fig.update_layout(
+                polar=dict(radialaxis=dict(visible=True)),
+                title="레이더 값은 전체 평균 대비 상대적 비율입니다.<br><span style='color:gray'>Radar values show each sheet's ratio to the global average (1.0 = mean)</span>",),
                               showlegend=True,
                               height=500,
                               font=dict(family="Nanum Gothic" if HANGUL_FONT else None))
