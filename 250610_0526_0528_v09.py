@@ -184,3 +184,35 @@ if uploaded_file:
         fig.update_layout(font=dict(family="Nanum Gothic" if HANGUL_FONT else None))
         st.plotly_chart(fig, use_container_width=True)
         st.dataframe(sheet_scores.round(4))
+
+        # --- Diagnostic Metrics Summary
+        st.markdown("## 🧮 진단 지표 분석<br><span style='color:gray'>Diagnostic Metrics Summary</span>", unsafe_allow_html=True)
+        
+        # Global Diagnostics
+        st.markdown("#### 🌐 전체 지표<br><span style='color:gray'>Global Diagnostic Metrics</span>", unsafe_allow_html=True)
+        global_metrics = {
+            "SEE1 (Sensor1 Energy per Unit)": df_all["Sensor1"].sum() / df_all["Quantity"].sum(),
+            "SEE2 (Sensor2 Energy per Unit)": df_all["Sensor2"].sum() / df_all["Quantity"].sum(),
+            "Transition Count": (df_all["Quantity"] > 0).astype(int).diff().abs().sum(),
+            "SPWD1 (Std/Mean Sensor1 per unit)": df_all["Sensor1_per_unit"].std() / df_all["Sensor1_per_unit"].mean(),
+            "SPWD2 (Std/Mean Sensor2 per unit)": df_all["Sensor2_per_unit"].std() / df_all["Sensor2_per_unit"].mean(),
+        }
+        st.dataframe(pd.DataFrame(global_metrics, index=["Global"]).T.round(4))
+        
+        # Per-sheet Metrics in Expander
+        with st.expander("📂 시트별 진단 지표 보기\n\nView Diagnostic Metrics per Sheet"):
+            diagnostics = []
+            for sheet in selected_sheets:
+                subset = df_all[df_all["Sheet"] == sheet]
+                row = {
+                    "Sheet": sheet,
+                    "SEE1": subset["Sensor1"].sum() / subset["Quantity"].sum(),
+                    "SEE2": subset["Sensor2"].sum() / subset["Quantity"].sum(),
+                    "Transitions": (subset["Quantity"] > 0).astype(int).diff().abs().sum(),
+                    "SPWD1": subset["Sensor1_per_unit"].std() / subset["Sensor1_per_unit"].mean(),
+                    "SPWD2": subset["Sensor2_per_unit"].std() / subset["Sensor2_per_unit"].mean(),
+                }
+                diagnostics.append(row)
+        
+            df_diag = pd.DataFrame(diagnostics)
+            st.dataframe(df_diag.round(4))
