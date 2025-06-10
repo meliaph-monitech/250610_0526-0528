@@ -36,7 +36,7 @@ if uploaded_file:
     xls = pd.ExcelFile(uploaded_file)
     st.sidebar.success("사용자 업로드 데이터를 사용 중입니다.\n\nUsing user-uploaded data.")
 else:
-    default_path = "https://github.com/meliaph-monitech/250610_0526-0528/blob/main/250610_sampledata.xlsx"
+    default_path = "https://raw.githubusercontent.com/meliaph-monitech/250610_0526-0528/main/250610_sampledata.xlsx"
     try:
         xls = pd.ExcelFile(default_path)
         st.sidebar.info("기본 샘플 데이터를 사용 중입니다.\n\nUsing default sample data.")
