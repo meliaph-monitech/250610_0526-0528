@@ -1,92 +1,104 @@
 import streamlit as st
 import pandas as pd
-import seaborn as sns
+import numpy as np
 import matplotlib.pyplot as plt
-import plotly.express as px
+import seaborn as sns
 from io import BytesIO
 
 st.set_page_config(layout="wide")
+st.title("📊 5분 간격 생산 및 측정 데이터 분석 대시보드")
 
-st.title("📊 Korean Partner Data Analysis Dashboard")
-
-# File uploader
-uploaded_file = st.sidebar.file_uploader("Upload an Excel file", type=".xlsx")
-
+# --- Upload section ---
+uploaded_file = st.file_uploader("📂 엑셀 파일을 업로드하세요 (.xlsx)", type=["xlsx"])
 if uploaded_file:
     xls = pd.ExcelFile(uploaded_file)
-    sheet_names = xls.sheet_names
-
-    selected_sheets = st.sidebar.multiselect("Select sheet(s) to include", sheet_names)
+    all_sheets = xls.sheet_names
+    selected_sheets = st.multiselect("분석할 시트를 선택하세요:", all_sheets, default=all_sheets[:3])
 
     if selected_sheets:
-        data_dict = {}
-        all_times = []
-
+        data_frames = []
         for sheet in selected_sheets:
-            df = pd.read_excel(uploaded_file, sheet_name=sheet)
-            df.columns = ['시간', '생산수량', 'RR RH-1', 'RR RH-2']
-            df['시간'] = pd.to_datetime(df['시간'].astype(str))
-            df = df.sort_values('시간').reset_index(drop=True)
-            df = df[df['생산수량'] > 0]  # filter valid rows for RR RH values
-            data_dict[sheet] = df
-            all_times.extend(df['시간'].tolist())
+            df = pd.read_excel(xls, sheet_name=sheet)
+            df = df.rename(columns={df.columns[0]: "Timestamp", df.columns[1]: "Quantity",
+                                    df.columns[2]: "RR_RH_1", df.columns[3]: "RR_RH_2"})
+            df["Timestamp"] = pd.to_datetime(df["Timestamp"])
+            df["Sheet"] = sheet
+            data_frames.append(df)
 
-        # Create unified timeline
-        unified_time = pd.Series(sorted(pd.Series(all_times).unique()))
+        df_all = pd.concat(data_frames, ignore_index=True)
+        df_all.sort_values(by="Timestamp", inplace=True)
 
-        # Align data to unified time index
-        aligned_data = []
-        for sheet, df in data_dict.items():
-            df_aligned = pd.DataFrame({'시간': unified_time})
-            df_merged = pd.merge(df_aligned, df, on='시간', how='left')
-            df_merged['Sheet'] = sheet
-            aligned_data.append(df_merged)
+        st.subheader("📌 시트 통합 및 전처리 완료")
+        st.write(f"총 {len(df_all)}개의 데이터 포인트가 통합되었습니다.")
+        st.dataframe(df_all.head(10))
 
-        combined_df = pd.concat(aligned_data, ignore_index=True)
-
-        # --- Descriptive Statistics ---
-        st.subheader("📌 Descriptive Statistics")
-        for sheet in selected_sheets:
-            st.markdown(f"#### Sheet: {sheet}")
-            df = combined_df[combined_df['Sheet'] == sheet]
-            st.dataframe(df[['생산수량', 'RR RH-1', 'RR RH-2']].describe())
-
-        st.markdown("### Global Descriptive Statistics")
-        st.dataframe(combined_df[['생산수량', 'RR RH-1', 'RR RH-2']].describe())
-
-        # --- Pairwise Correlation Heatmap ---
-        if st.button("Generate Pairwise Corr."):
-            st.subheader("🔗 Correlation Heatmap")
-
-            corr_mode = st.radio("View correlation heatmap per sheet or global", ["Per Sheet", "Global"], horizontal=True)
-
-            if corr_mode == "Per Sheet":
-                for sheet in selected_sheets:
-                    st.markdown(f"#### Sheet: {sheet}")
-                    df = combined_df[combined_df['Sheet'] == sheet]
-                    fig, ax = plt.subplots()
-                    sns.heatmap(df[['생산수량', 'RR RH-1', 'RR RH-2']].corr(), annot=True, cmap='coolwarm', ax=ax)
-                    st.pyplot(fig)
+        # --- Descriptive Stats ---
+        with st.expander("📈 기술 통계량 보기 (per 시트 또는 전체)"):
+            mode = st.radio("보기 모드 선택:", ["전체 통합", "시트별"], horizontal=True)
+            if mode == "전체 통합":
+                st.write(df_all.describe(include='all'))
             else:
-                fig, ax = plt.subplots()
-                sns.heatmap(combined_df[['생산수량', 'RR RH-1', 'RR RH-2']].corr(), annot=True, cmap='coolwarm', ax=ax)
-                st.pyplot(fig)
+                for sheet in selected_sheets:
+                    st.markdown(f"**▶ 시트: {sheet}**")
+                    st.dataframe(df_all[df_all["Sheet"] == sheet].describe(include='all'))
 
-        # --- Time-Series Plots ---
-        st.subheader("📈 Time-Series Analysis")
-        for col in ['RR RH-1', 'RR RH-2']:
-            fig = px.line(
-                combined_df.dropna(subset=[col]),
-                x='시간', y=col, color='Sheet',
-                title=f"{col} over Time (Aligned per Sheet)",
-                labels={'시간': 'Time', col: col}
-            )
-            st.plotly_chart(fig, use_container_width=True)
+        # --- Visualization of Descriptive Stats ---
+        st.subheader("📊 시간 기반 변수 시각화")
+        for column in ["Quantity", "RR_RH_1", "RR_RH_2"]:
+            st.markdown(f"**📌 {column}**")
+            fig, ax = plt.subplots(figsize=(12, 3))
+            for sheet in selected_sheets:
+                sub = df_all[df_all["Sheet"] == sheet]
+                ax.bar(sub["Timestamp"], sub[column], width=0.003, label=sheet)
+            ax.set_ylabel(column)
+            ax.set_xlabel("Timestamp")
+            ax.legend()
+            st.pyplot(fig)
 
-        # --- Comparative Global Summary ---
-        st.subheader("📊 Comparative Summary")
-        summary = combined_df.groupby('Sheet')[['RR RH-1', 'RR RH-2']].mean().reset_index()
-        st.dataframe(summary.set_index('Sheet'))
+        # --- Correlation Analysis ---
+        st.subheader("🔗 상관관계 분석")
+        numeric_cols = ["Quantity", "RR_RH_1", "RR_RH_2"]
+        st.markdown("**▶ 전체 데이터 기준 상관계수 (Pearson)**")
+        corr = df_all[numeric_cols].corr(method="pearson")
+        fig, ax = plt.subplots()
+        sns.heatmap(corr, annot=True, cmap="coolwarm", ax=ax)
+        st.pyplot(fig)
 
-else:
-    st.info("Please upload an Excel file to begin.")
+        # --- Cross Correlation ---
+        st.subheader("⏱️ 시차 기반 상관관계 분석 (Cross Correlation)")
+        ref_col = st.selectbox("기준 컬럼 선택:", numeric_cols)
+        compare_col = st.selectbox("비교할 컬럼 선택:", [col for col in numeric_cols if col != ref_col])
+        max_lag = st.slider("최대 시차 범위 (단위: row)", 1, 100, 20)
+
+        series1 = df_all[ref_col].dropna()
+        series2 = df_all[compare_col].dropna()
+
+        min_len = min(len(series1), len(series2))
+        series1 = series1[:min_len]
+        series2 = series2[:min_len]
+
+        xcorr = [series1.corr(series2.shift(lag)) for lag in range(-max_lag, max_lag+1)]
+        fig, ax = plt.subplots()
+        ax.plot(range(-max_lag, max_lag+1), xcorr)
+        ax.set_title(f"Cross Correlation: {ref_col} vs {compare_col}")
+        ax.set_xlabel("Lag")
+        ax.set_ylabel("Correlation")
+        st.pyplot(fig)
+
+        # --- Sheet Comparison ---
+        st.subheader("🧩 시트 간 비교")
+        compare_stat = st.selectbox("비교할 통계값:", ["mean", "std", "min", "max"])
+        sheet_stats = df_all.groupby("Sheet")[numeric_cols].agg(compare_stat)
+
+        fig, ax = plt.subplots(figsize=(8, 4))
+        sheet_stats.plot(kind="bar", ax=ax)
+        ax.set_title(f"시트별 {compare_stat} 값 비교")
+        st.pyplot(fig)
+
+        # --- Missing Value Heatmap ---
+        st.subheader("🕳️ 결측값 개요")
+        missing_counts = df_all.groupby("Sheet")[numeric_cols].apply(lambda x: x.isna().sum())
+        fig, ax = plt.subplots()
+        sns.heatmap(missing_counts, annot=True, cmap="Reds", fmt="d", ax=ax)
+        ax.set_title("시트별 결측값 개수")
+        st.pyplot(fig)
