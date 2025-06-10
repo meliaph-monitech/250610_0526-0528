@@ -190,10 +190,11 @@ if uploaded_file:
         
         # Global Diagnostics
         st.markdown("#### 🌐 전체 지표<br><span style='color:gray'>Global Diagnostic Metrics</span>", unsafe_allow_html=True)
+        total_rows = len(df_all)
         global_metrics = {
             "SEE1 (Sensor1 Energy per Unit)": df_all["Sensor1"].sum() / df_all["Quantity"].sum(),
             "SEE2 (Sensor2 Energy per Unit)": df_all["Sensor2"].sum() / df_all["Quantity"].sum(),
-            "Transition Count": (df_all["Quantity"] > 0).astype(int).diff().abs().sum(),
+            "Transition Rate": (df_all["Quantity"] > 0).astype(int).diff().abs().sum() / total_rows,
             "SPWD1 (Std/Mean Sensor1 per unit)": df_all["Sensor1_per_unit"].std() / df_all["Sensor1_per_unit"].mean(),
             "SPWD2 (Std/Mean Sensor2 per unit)": df_all["Sensor2_per_unit"].std() / df_all["Sensor2_per_unit"].mean(),
         }
@@ -204,11 +205,12 @@ if uploaded_file:
             diagnostics = []
             for sheet in selected_sheets:
                 subset = df_all[df_all["Sheet"] == sheet]
+                num_rows = len(subset)
                 row = {
                     "Sheet": sheet,
                     "SEE1": subset["Sensor1"].sum() / subset["Quantity"].sum(),
                     "SEE2": subset["Sensor2"].sum() / subset["Quantity"].sum(),
-                    "Transitions": (subset["Quantity"] > 0).astype(int).diff().abs().sum(),
+                    "Transition Rate": (subset["Quantity"] > 0).astype(int).diff().abs().sum() / num_rows,
                     "SPWD1": subset["Sensor1_per_unit"].std() / subset["Sensor1_per_unit"].mean(),
                     "SPWD2": subset["Sensor2_per_unit"].std() / subset["Sensor2_per_unit"].mean(),
                 }
@@ -216,3 +218,39 @@ if uploaded_file:
         
             df_diag = pd.DataFrame(diagnostics)
             st.dataframe(df_diag.round(4))
+        
+        # Visual Summary Section
+        with st.expander("📊 진단 시각화 보기\n\nView Diagnostic Visual Summary"):
+            import plotly.express as px
+            import plotly.graph_objects as go
+        
+            # Radar Chart (normalized)
+            st.markdown("### 🕸️ 시트별 종합 진단 레이더<br><span style='color:gray'>Radar Chart of Sheet Diagnostics</span>", unsafe_allow_html=True)
+            radar_df = df_diag.copy()
+            metrics = ["SEE1", "SEE2", "Transition Rate", "SPWD1", "SPWD2"]
+            radar_df_norm = radar_df.copy()
+            for col in metrics:
+                radar_df_norm[col] = (radar_df[col] - radar_df[col].min()) / (radar_df[col].max() - radar_df[col].min())
+        
+            fig = go.Figure()
+            for i, row in radar_df_norm.iterrows():
+                fig.add_trace(go.Scatterpolar(
+                    r=row[metrics].tolist(),
+                    theta=metrics,
+                    fill='toself',
+                    name=row["Sheet"]
+                ))
+            fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 1])),
+                              showlegend=True,
+                              height=500,
+                              font=dict(family="Nanum Gothic" if HANGUL_FONT else None))
+            st.plotly_chart(fig, use_container_width=True)
+        
+            # Heatmap of diagnostics
+            st.markdown("### 🔥 진단 지표 히트맵<br><span style='color:gray'>Heatmap of Diagnostic Metrics</span>", unsafe_allow_html=True)
+            fig = px.imshow(df_diag.set_index("Sheet")[metrics].round(4),
+                            text_auto=True,
+                            color_continuous_scale="Viridis",
+                            aspect="auto")
+            fig.update_layout(font=dict(family="Nanum Gothic" if HANGUL_FONT else None))
+            st.plotly_chart(fig, use_container_width=True)
