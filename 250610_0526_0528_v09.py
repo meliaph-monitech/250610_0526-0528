@@ -168,6 +168,24 @@ if uploaded_file:
             fig.update_layout(xaxis_tickangle=90, font=dict(family="Nanum Gothic" if HANGUL_FONT else None))
             st.plotly_chart(fig, use_container_width=True)
 
+        # --- Sensor Stability by Quantity Level
+        st.markdown("## 📈 생산량 구간별 센서 평균 비교<br><span style='color:gray'>Sensor Value by Production Quantity Level</span>", unsafe_allow_html=True)
+
+        # Categorize Quantity into levels
+        df_all["Quantity_Level"] = pd.qcut(df_all["Quantity"], q=3, labels=["Low", "Medium", "High"])
+
+        # Grouped Boxplot: Sensor1_per_unit
+        st.markdown("### Sensor1 단위당 값 - 생산량 구간별<br><span style='color:gray'>Sensor1 per Unit by Quantity Tier</span>", unsafe_allow_html=True)
+        fig = px.box(df_all, x="Quantity_Level", y="Sensor1_per_unit", color="Quantity_Level", points="all")
+        fig.update_layout(font=dict(family="Nanum Gothic" if HANGUL_FONT else None))
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Grouped Boxplot: Sensor2_per_unit
+        st.markdown("### Sensor2 단위당 값 - 생산량 구간별<br><span style='color:gray'>Sensor2 per Unit by Quantity Tier</span>", unsafe_allow_html=True)
+        fig = px.box(df_all, x="Quantity_Level", y="Sensor2_per_unit", color="Quantity_Level", points="all")
+        fig.update_layout(font=dict(family="Nanum Gothic" if HANGUL_FONT else None))
+        st.plotly_chart(fig, use_container_width=True)
+        
         # --- Sensor Reliability Index (SRI)
         st.markdown("## 📏 센서 안정성 지수 (SRI)<br><span style='color:gray'>Sensor Reliability Index</span>", unsafe_allow_html=True)
         sheet_scores = df_all.groupby("Sheet").agg({
