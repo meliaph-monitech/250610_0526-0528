@@ -6,7 +6,7 @@ import plotly.graph_objects as go
 import matplotlib.font_manager as fm
 from datetime import datetime, time
 
-# Set Hangul font if available
+# Set Hangul font
 HANGUL_FONT = None
 for f in fm.findSystemFonts(fontpaths=None, fontext='ttf'):
     if "NanumGothic" in f or "Malgun" in f:
@@ -16,7 +16,6 @@ for f in fm.findSystemFonts(fontpaths=None, fontext='ttf'):
 st.set_page_config(layout="wide")
 st.title("📊 스마트 용접 신호 분석 대시보드")
 
-# --- Excel time formatting fix ---
 def format_excel_time(t):
     if pd.isna(t): return np.nan
     if isinstance(t, (pd.Timestamp, datetime)): return t.strftime("%H:%M")
@@ -51,97 +50,103 @@ if uploaded_file:
             df["Sheet"] = sheet
             df["Date"] = sheet[:4]
             df["SensorType"] = sheet.split("_")[-1]
+            df["TimeKey"] = df["Sheet"] + "_" + df["Timestamp"]
             dfs.append(df)
 
         df_all = pd.concat(dfs, ignore_index=True)
         df_all.dropna(subset=["Timestamp"], inplace=True)
         df_all.fillna(0, inplace=True)
 
-        # Derived columns
         df_all["Sensor1_per_unit"] = df_all["Sensor1"] / df_all["Quantity"].replace(0, np.nan)
         df_all["Sensor2_per_unit"] = df_all["Sensor2"] / df_all["Quantity"].replace(0, np.nan)
         df_all["Delta"] = df_all["Sensor1"] - df_all["Sensor2"]
 
-        # Set timestamp as ordered categorical
-        df_all["Timestamp"] = pd.Categorical(df_all["Timestamp"],
-                                             categories=sorted(df_all["Timestamp"].unique()),
-                                             ordered=True)
-
-        # --- Overview Summary ---
         st.subheader("📌 데이터 요약")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("전체 생산수량", int(df_all["Quantity"].sum()))
-        with col2:
-            st.metric("총 시트 개수", len(selected_sheets))
+        st.metric("전체 생산수량", int(df_all["Quantity"].sum()))
+        st.metric("총 시트 개수", len(selected_sheets))
 
-        st.dataframe(df_all[["Sheet", "Date", "SensorType", "Timestamp", "Quantity",
-                             "Sensor1", "Sensor2", "Sensor1_per_unit", "Sensor2_per_unit", "Delta"]].head(10))
+        # Show head of data
+        st.dataframe(df_all[["Sheet", "Date", "SensorType", "Timestamp", "Quantity", "Sensor1", "Sensor2",
+                             "Sensor1_per_unit", "Sensor2_per_unit", "Delta"]].head(10))
 
-        # --- Time-series Plots ---
-        st.subheader("⏱️ 시간별 생산수량 및 센서 평균값")
+        # --- Time-Series by TimeKey (to avoid cross-day link)
+        st.subheader("⏱️ 시간별 센서 및 생산량")
         for col in ["Quantity", "Sensor1", "Sensor2"]:
-            fig = px.bar(df_all, x="Timestamp", y=col, color="Sheet", barmode="group",
-                         title=f"{col} (시간 기준)", height=350)
-            fig.update_layout(
-                xaxis_tickangle=90,
-                font=dict(family="Nanum Gothic" if HANGUL_FONT else None)
-            )
-            st.plotly_chart(fig, use_container_width=True)
-
-        # --- Sensor vs Quantity Correlation ---
-        st.subheader("🔗 생산량과 센서 평균값의 상관관계")
-        for sensor_col in ["Sensor1", "Sensor2"]:
-            fig = px.scatter(df_all, x="Quantity", y=sensor_col, color="Sheet", trendline="ols",
-                             title=f"{sensor_col} vs Quantity (산점도 + 추세선)")
-            fig.update_layout(font=dict(family="Nanum Gothic" if HANGUL_FONT else None))
-            st.plotly_chart(fig, use_container_width=True)
-
-        # --- Normalized Signal (per unit) ---
-        st.subheader("⚖️ 센서당 용접 단위당 평균 신호")
-        for col in ["Sensor1_per_unit", "Sensor2_per_unit"]:
-            fig = px.line(df_all, x="Timestamp", y=col, color="Sheet", markers=True,
-                          title=f"{col} (시간 순)")
+            fig = px.bar(df_all, x="TimeKey", y=col, color="Sheet", title=f"{col} (시간순)",
+                         labels={"TimeKey": "시트+시간", col: col})
             fig.update_layout(xaxis_tickangle=90, font=dict(family="Nanum Gothic" if HANGUL_FONT else None))
             st.plotly_chart(fig, use_container_width=True)
 
-        # --- Delta Between Sensors ---
-        st.subheader("📉 센서 차이: Sensor1 - Sensor2")
-        fig = px.line(df_all, x="Timestamp", y="Delta", color="Sheet", markers=True,
-                      title="Delta: Sensor1 - Sensor2")
+        # --- Quantity vs Sensor per unit
+        st.subheader("📉 생산량 대비 단위당 센서 평균값")
+        for col in ["Sensor1_per_unit", "Sensor2_per_unit"]:
+            fig = px.scatter(df_all, x="Quantity", y=col, color="Sheet", trendline="lowess",
+                             title=f"{col} vs Quantity", labels={"Quantity": "생산량", col: "단위당 평균"})
+            fig.update_layout(font=dict(family="Nanum Gothic" if HANGUL_FONT else None))
+            st.plotly_chart(fig, use_container_width=True)
+
+        # --- Delta plots
+        st.subheader("⚖️ 센서 차이 및 드리프트")
+        fig = px.line(df_all, x="TimeKey", y="Delta", color="Sheet", title="Sensor1 - Sensor2 (Delta)",
+                      labels={"TimeKey": "시트+시간", "Delta": "차이"})
         fig.update_layout(xaxis_tickangle=90, font=dict(family="Nanum Gothic" if HANGUL_FONT else None))
         st.plotly_chart(fig, use_container_width=True)
 
-        # --- Rolling Mean & Diff ---
-        st.subheader("🔄 이동 평균 및 변화량 분석")
-        window = st.sidebar.slider("이동 윈도우 크기 (row)", 1, 20, 5)
-        for col in ["Sensor1", "Sensor2"]:
+        fig = px.histogram(df_all, x="Delta", color="Sheet", nbins=50,
+                           title="Sensor Delta 분포 (Sensor1 - Sensor2)")
+        fig.update_layout(font=dict(family="Nanum Gothic" if HANGUL_FONT else None))
+        st.plotly_chart(fig, use_container_width=True)
+
+        # --- Rolling mean per unit signal
+        st.subheader("🔄 단위당 신호의 이동 평균")
+        window = st.sidebar.slider("이동 평균 윈도우 (row)", 1, 20, 5)
+        for col in ["Sensor1_per_unit", "Sensor2_per_unit"]:
             df_all[f"{col}_roll"] = df_all[col].rolling(window=window, min_periods=1).mean()
-            df_all[f"{col}_diff"] = df_all[col].diff()
+            fig = px.line(df_all, x="TimeKey", y=f"{col}_roll", color="Sheet",
+                          title=f"{col} 이동 평균", labels={f"{col}_roll": "이동 평균", "TimeKey": "시트+시간"})
+            fig.update_layout(xaxis_tickangle=90, font=dict(family="Nanum Gothic" if HANGUL_FONT else None))
+            st.plotly_chart(fig, use_container_width=True)
 
-            fig1 = px.line(df_all, x="Timestamp", y=f"{col}_roll", color="Sheet", title=f"{col} 이동 평균",
-                           labels={f"{col}_roll": f"{col} 이동 평균"})
-            fig2 = px.line(df_all, x="Timestamp", y=f"{col}_diff", color="Sheet", title=f"{col} 변화량",
-                           labels={f"{col}_diff": f"{col} 변화량"})
+        # --- Time-of-Day Boxplot
+        st.subheader("🕰️ 시간대별 센서 퍼 유닛 분포 (모든 시트)")
+        for col in ["Sensor1_per_unit", "Sensor2_per_unit"]:
+            fig = px.box(df_all, x="Timestamp", y=col, color="SensorType",
+                         title=f"{col} 시간대별 분포", labels={"Timestamp": "시간", col: "센서 퍼 유닛"})
+            fig.update_layout(xaxis_tickangle=90, font=dict(family="Nanum Gothic" if HANGUL_FONT else None))
+            st.plotly_chart(fig, use_container_width=True)
 
-            fig1.update_layout(xaxis_tickangle=90, font=dict(family="Nanum Gothic" if HANGUL_FONT else None))
-            fig2.update_layout(xaxis_tickangle=90, font=dict(family="Nanum Gothic" if HANGUL_FONT else None))
+        # --- Sheet-level correlation matrix
+        st.subheader("📊 시트별 상관계수 분석")
+        grouped_corrs = []
+        for sheet in selected_sheets:
+            subset = df_all[df_all["Sheet"] == sheet]
+            corr = subset[["Quantity", "Sensor1", "Sensor2", "Delta",
+                           "Sensor1_per_unit", "Sensor2_per_unit"]].corr()
+            grouped_corrs.append((sheet, corr))
 
-            st.plotly_chart(fig1, use_container_width=True)
-            st.plotly_chart(fig2, use_container_width=True)
+        for sheet, corr in grouped_corrs:
+            st.markdown(f"**{sheet} 상관계수**")
+            fig = px.imshow(corr, text_auto=True, aspect="auto", color_continuous_scale="RdBu", zmin=-1, zmax=1)
+            fig.update_layout(font=dict(family="Nanum Gothic" if HANGUL_FONT else None))
+            st.plotly_chart(fig, use_container_width=True)
 
-        # --- Sheet-level Summary ---
-        st.subheader("📊 시트 요약 비교")
-        sheet_summary = df_all.groupby("Sheet").agg({
-            "Quantity": "sum",
-            "Sensor1": "mean",
-            "Sensor2": "mean",
-            "Sensor1_per_unit": "mean",
-            "Sensor2_per_unit": "mean",
+        # --- Reliability Index (SRI)
+        st.subheader("📏 센서 안정성 지수 (SRI)")
+        sheet_scores = df_all.groupby("Sheet").agg({
+            "Sensor1_per_unit": "std",
+            "Sensor2_per_unit": "std",
             "Delta": "mean"
         }).reset_index()
 
-        st.dataframe(sheet_summary.round(2))
-        fig = px.bar(sheet_summary, x="Sheet", y="Quantity", title="시트별 총 생산량", color="Sheet")
+        # Simple scoring: lower std and smaller delta is better
+        sheet_scores["SRI"] = 1 - (
+            sheet_scores["Sensor1_per_unit"] + sheet_scores["Sensor2_per_unit"] + sheet_scores["Delta"].abs()
+        ) / 3
+
+        fig = px.bar(sheet_scores.sort_values("SRI", ascending=False),
+                     x="Sheet", y="SRI", title="센서 안정성 지수 (높을수록 안정)",
+                     labels={"SRI": "안정성 지수"}, color="Sheet")
         fig.update_layout(font=dict(family="Nanum Gothic" if HANGUL_FONT else None))
         st.plotly_chart(fig, use_container_width=True)
+
+        st.dataframe(sheet_scores.round(4))
