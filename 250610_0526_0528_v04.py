@@ -147,13 +147,21 @@ if uploaded_file:
             df_all[f"{col}_diff"] = df_all[col].diff()
 
             st.markdown(f"**{col} - 이동 평균**")
-            fig = px.line(df_all, x="Timestamp", y=f"{col}_roll", color="Sheet", labels={"value": "값"})
+            # fig = px.line(df_all, x="Timestamp", y=f"{col}_roll", color="Sheet", labels={"value": "값"})
+            roll_df = df_all.dropna(subset=[f"{col}_roll"])
+            fig = px.line(roll_df, x="Timestamp", y=f"{col}_roll", color="Sheet",
+                          labels={"value": "값", f"{col}_roll": f"{col} 이동평균"})
+
             fig.update_layout(xaxis_tickangle=90, font=dict(family="Nanum Gothic" if HANGUL_FONT else None))
             fig.update_traces(connectgaps=False)
             st.plotly_chart(fig, use_container_width=True)
 
             st.markdown(f"**{col} - 변화율 (diff)**")
-            fig = px.line(df_all, x="Timestamp", y=f"{col}_diff", color="Sheet", labels={"value": "값"})
+            # fig = px.line(df_all, x="Timestamp", y=f"{col}_diff", color="Sheet", labels={"value": "값"})
+            diff_df = df_all.dropna(subset=[f"{col}_diff"])
+            fig = px.line(diff_df, x="Timestamp", y=f"{col}_diff", color="Sheet",
+                          labels={"value": "값", f"{col}_diff": f"{col} 변화율"})
+
             fig.update_layout(xaxis_tickangle=90, font=dict(family="Nanum Gothic" if HANGUL_FONT else None))
             fig.update_traces(connectgaps=False)
             st.plotly_chart(fig, use_container_width=True)
