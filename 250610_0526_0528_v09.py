@@ -245,6 +245,7 @@ if uploaded_file:
                 ))
             fig.update_layout(
                 polar=dict(radialaxis=dict(visible=True)),
+                title="레이더 값은 전체 평균 대비 상대적 비율입니다.<br><span style='color:gray'>Radar values show each sheet's ratio to the global average (1.0 = mean)</span>",
                 title="레이더 값은 전체 평균 대비 상대적 비율입니다.<br><span style='color:gray'>Radar values show each sheet's ratio to the global average (1.0 = mean)</span>",),
                               showlegend=True,
                               height=500,
@@ -259,3 +260,4 @@ if uploaded_file:
                             aspect="auto")
             fig.update_layout(font=dict(family="Nanum Gothic" if HANGUL_FONT else None))
             st.plotly_chart(fig, use_container_width=True)
+
