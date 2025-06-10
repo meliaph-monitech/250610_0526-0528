@@ -60,7 +60,7 @@ if uploaded_file:
                                              ordered=True)
 
         st.subheader("📌 전처리된 통합 데이터")
-        st.dataframe(df_all.head(10))
+        st.dataframe(df_all.sample(10))
 
         # --- Descriptive Stats ---
         stat_mode = st.sidebar.radio("기술 통계 보기 방식:", ["전체 통합", "시트별"])
