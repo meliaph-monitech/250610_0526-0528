@@ -33,20 +33,27 @@ def format_excel_time(t):
 st.sidebar.header("🧭 대시보드 설정\n\nSensor Data Dashboard Settings")
 uploaded_file = st.sidebar.file_uploader("엑셀 파일 업로드 (.xlsx)\n\nUpload Excel File", type=["xlsx"])
 
-# Determine source: user upload OR default URL
+use_sample = st.sidebar.button("📂 샘플 데이터 사용\n\nUse Sample Data")
+
+# Load Excel file (uploaded or sample)
+xls = None
+
 if uploaded_file is not None:
     xls = pd.ExcelFile(uploaded_file)
-    st.sidebar.success("사용자 업로드 데이터를 사용 중입니다.\n\nUsing user-uploaded data.")
-else:
-    default_url = "https://raw.githubusercontent.com/meliaph-monitech/250610_0526-0528/main/250610_sampledata.xlsx"
+    st.sidebar.success("✅ 사용자 업로드 데이터를 사용 중입니다.\n\nUsing user-uploaded data.")
+elif use_sample:
     try:
+        default_url = "https://raw.githubusercontent.com/meliaph-monitech/250610_0526-0528/main/250610_sampledata.xlsx"
         response = requests.get(default_url)
         response.raise_for_status()
         xls = pd.ExcelFile(BytesIO(response.content))
-        st.sidebar.info("기본 샘플 데이터를 사용 중입니다.\n\nUsing default sample data.")
+        st.sidebar.info("📁 샘플 데이터를 사용 중입니다.\n\nUsing default sample data.")
     except Exception as e:
-        st.error(f"기본 샘플 파일을 불러올 수 없습니다.\n\nCould not load default sample file.\n\nError: {e}")
+        st.error(f"❌ 샘플 파일을 불러올 수 없습니다.\n\nCould not load sample data.\n\nError: {e}")
         st.stop()
+else:
+    st.warning("📤 엑셀 파일을 업로드하거나 샘플 데이터를 선택해주세요.\n\nPlease upload an Excel file or use the sample data.")
+    st.stop()
 
 # Proceed only if xls was successfully defined
 all_sheets = xls.sheet_names
