@@ -4,8 +4,9 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import matplotlib.font_manager as fm
+from datetime import datetime, time
 
-# Korean font handling for Plotly hover/display
+# Set Hangul font if available
 HANGUL_FONT = None
 for f in fm.findSystemFonts(fontpaths=None, fontext='ttf'):
     if "NanumGothic" in f or "Malgun" in f:
@@ -14,6 +15,23 @@ for f in fm.findSystemFonts(fontpaths=None, fontext='ttf'):
 
 st.set_page_config(layout="wide")
 st.title("📊 5분 간격 생산 및 측정 데이터 분석 대시보드")
+
+# --- Excel time formatting fix ---
+def format_excel_time(t):
+    if pd.isna(t):
+        return np.nan
+    if isinstance(t, (pd.Timestamp, datetime)):
+        return t.strftime("%H:%M")
+    elif isinstance(t, time):
+        return t.strftime("%H:%M")
+    elif isinstance(t, (int, float)):  # Excel float time
+        minutes = int(round(t * 24 * 60))
+        return f"{minutes // 60:02}:{minutes % 60:02}"
+    else:
+        try:
+            return pd.to_datetime(t).strftime("%H:%M")
+        except:
+            return str(t)
 
 # --- Upload section ---
 uploaded_file = st.file_uploader("📂 엑셀 파일을 업로드하세요 (.xlsx)", type=["xlsx"])
@@ -28,17 +46,17 @@ if uploaded_file:
             df = pd.read_excel(xls, sheet_name=sheet)
             df = df.rename(columns={df.columns[0]: "Timestamp", df.columns[1]: "Quantity",
                                     df.columns[2]: "RR_RH_1", df.columns[3]: "RR_RH_2"})
-            df["Timestamp"] = df["Timestamp"].astype(str)
+            df["Timestamp"] = df["Timestamp"].apply(format_excel_time)
             df["Sheet"] = sheet
             data_frames.append(df)
 
         df_all = pd.concat(data_frames, ignore_index=True)
         df_all.dropna(subset=["Timestamp"], inplace=True)
 
-        # Force categorical time labels to prevent Plotly from misinterpreting
-        df_all["Timestamp"] = df_all["Timestamp"].astype(str)
-        unique_times_sorted = sorted(df_all["Timestamp"].unique())
-        df_all["Timestamp"] = pd.Categorical(df_all["Timestamp"], categories=unique_times_sorted, ordered=True)
+        # Enforce clean categorical ordering for Timestamp
+        df_all["Timestamp"] = pd.Categorical(df_all["Timestamp"],
+                                             categories=sorted(df_all["Timestamp"].unique()),
+                                             ordered=True)
 
         st.subheader("📌 전처리된 통합 데이터")
         st.write(f"총 {len(df_all)}개의 데이터가 통합되었습니다.")
@@ -54,7 +72,7 @@ if uploaded_file:
                     st.markdown(f"**▶ 시트: {sheet}**")
                     st.dataframe(df_all[df_all["Sheet"] == sheet][["Quantity", "RR_RH_1", "RR_RH_2"]].describe())
 
-        # --- Time-series Plot per Column ---
+        # --- Time-series Plots per Column ---
         st.subheader("📊 시간별 변수 시각화 (컬럼별)")
         for column in ["Quantity", "RR_RH_1", "RR_RH_2"]:
             st.markdown(f"**📌 {column}**")
