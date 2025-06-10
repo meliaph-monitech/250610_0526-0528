@@ -26,8 +26,6 @@ if uploaded_file:
             df.columns = ['시간', '생산수량', 'RR RH-1', 'RR RH-2']
             df['시간'] = pd.to_datetime(df['시간'].astype(str))
             df = df.sort_values('시간').reset_index(drop=True)
-            start_time = df['시간'].iloc[0]
-            df['정렬된시간'] = (df['시간'] - start_time).dt.total_seconds() / 60  # minutes from sheet start
             data_dict[sheet] = df
 
         # --- Descriptive Statistics ---
@@ -64,9 +62,9 @@ if uploaded_file:
         for col in ['RR RH-1', 'RR RH-2']:
             fig = px.line(
                 combined_df.dropna(subset=[col]),
-                x='정렬된시간', y=col, color='Sheet',
-                title=f"{col} over Aligned Time (per Sheet)",
-                labels={'정렬된시간': 'Elapsed Time (min)', col: col}
+                x='시간', y=col, color='Sheet',
+                title=f"{col} over Time (per Sheet)",
+                labels={'시간': 'Time', col: col}
             )
             st.plotly_chart(fig, use_container_width=True)
 
