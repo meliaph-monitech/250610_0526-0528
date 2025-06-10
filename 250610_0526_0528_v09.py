@@ -186,6 +186,7 @@ if uploaded_file:
         st.dataframe(sheet_scores.round(4))
 
         # --- Diagnostic Metrics Summary
+        # Additional Metrics Section: Global + Per-Sheet Diagnostics
         st.markdown("## 🧮 진단 지표 분석<br><span style='color:gray'>Diagnostic Metrics Summary</span>", unsafe_allow_html=True)
         
         # Global Diagnostics
@@ -224,13 +225,14 @@ if uploaded_file:
             import plotly.express as px
             import plotly.graph_objects as go
         
-            # Radar Chart (normalized)
+            # Radar Chart (mean-normalized)
             st.markdown("### 🕸️ 시트별 종합 진단 레이더<br><span style='color:gray'>Radar Chart of Sheet Diagnostics</span>", unsafe_allow_html=True)
             radar_df = df_diag.copy()
             metrics = ["SEE1", "SEE2", "Transition Rate", "SPWD1", "SPWD2"]
             radar_df_norm = radar_df.copy()
             for col in metrics:
-                radar_df_norm[col] = (radar_df[col] - radar_df[col].min()) / (radar_df[col].max() - radar_df[col].min())
+                mean_val = radar_df[col].mean()
+                radar_df_norm[col] = radar_df[col] / mean_val if mean_val != 0 else 0
         
             fig = go.Figure()
             for i, row in radar_df_norm.iterrows():
@@ -240,7 +242,7 @@ if uploaded_file:
                     fill='toself',
                     name=row["Sheet"]
                 ))
-            fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 1])),
+            fig.update_layout(polar=dict(radialaxis=dict(visible=True)),
                               showlegend=True,
                               height=500,
                               font=dict(family="Nanum Gothic" if HANGUL_FONT else None))
