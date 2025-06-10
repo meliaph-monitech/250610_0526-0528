@@ -6,17 +6,14 @@ import plotly.graph_objects as go
 import matplotlib.font_manager as fm
 from datetime import datetime, time
 
-# Set Hangul font if available
+# Hangul font setup
 HANGUL_FONT = None
 for f in fm.findSystemFonts(fontpaths=None, fontext='ttf'):
     if "NanumGothic" in f or "Malgun" in f:
         HANGUL_FONT = f
         break
 
-st.set_page_config(layout="wide")
-st.title("📊 5분 간격 생산 및 측정 데이터 분석 대시보드")
-
-# --- Excel time formatting fix ---
+# --- Utility to handle Excel time-only values ---
 def format_excel_time(t):
     if pd.isna(t):
         return np.nan
@@ -24,7 +21,7 @@ def format_excel_time(t):
         return t.strftime("%H:%M")
     elif isinstance(t, time):
         return t.strftime("%H:%M")
-    elif isinstance(t, (int, float)):  # Excel float time
+    elif isinstance(t, (int, float)):
         minutes = int(round(t * 24 * 60))
         return f"{minutes // 60:02}:{minutes % 60:02}"
     else:
@@ -33,12 +30,18 @@ def format_excel_time(t):
         except:
             return str(t)
 
-# --- Upload section ---
-uploaded_file = st.file_uploader("📂 엑셀 파일을 업로드하세요 (.xlsx)", type=["xlsx"])
+# --- Streamlit Layout ---
+st.set_page_config(layout="wide")
+st.title("📊 생산 데이터 통합 분석 대시보드")
+
+# --- Sidebar Controls ---
+st.sidebar.header("🧭 대시보드 설정")
+
+uploaded_file = st.sidebar.file_uploader("엑셀 파일 업로드 (.xlsx)", type=["xlsx"])
 if uploaded_file:
     xls = pd.ExcelFile(uploaded_file)
     all_sheets = xls.sheet_names
-    selected_sheets = st.multiselect("분석할 시트를 선택하세요:", all_sheets, default=all_sheets[:3])
+    selected_sheets = st.sidebar.multiselect("시트 선택:", all_sheets, default=all_sheets[:3])
 
     if selected_sheets:
         data_frames = []
@@ -52,50 +55,39 @@ if uploaded_file:
 
         df_all = pd.concat(data_frames, ignore_index=True)
         df_all.dropna(subset=["Timestamp"], inplace=True)
-
-        # Enforce clean categorical ordering for Timestamp
         df_all["Timestamp"] = pd.Categorical(df_all["Timestamp"],
                                              categories=sorted(df_all["Timestamp"].unique()),
                                              ordered=True)
 
         st.subheader("📌 전처리된 통합 데이터")
-        st.write(f"총 {len(df_all)}개의 데이터가 통합되었습니다.")
         st.dataframe(df_all.head(10))
 
-        # --- Descriptive Statistics ---
-        with st.expander("📈 기술 통계량 보기 (시트별 / 전체 통합)"):
-            mode = st.radio("보기 모드 선택:", ["전체 통합", "시트별"], horizontal=True)
-            if mode == "전체 통합":
+        # --- Descriptive Stats ---
+        stat_mode = st.sidebar.radio("기술 통계 보기 방식:", ["전체 통합", "시트별"])
+        with st.expander("📈 기술 통계량"):
+            if stat_mode == "전체 통합":
                 st.dataframe(df_all[["Quantity", "RR_RH_1", "RR_RH_2"]].describe())
             else:
                 for sheet in selected_sheets:
                     st.markdown(f"**▶ 시트: {sheet}**")
                     st.dataframe(df_all[df_all["Sheet"] == sheet][["Quantity", "RR_RH_1", "RR_RH_2"]].describe())
 
-        # --- Time-series Plots per Column ---
-        st.subheader("📊 시간별 변수 시각화 (컬럼별)")
-        for column in ["Quantity", "RR_RH_1", "RR_RH_2"]:
-            st.markdown(f"**📌 {column}**")
-            fig = px.bar(
-                df_all, x="Timestamp", y=column, color="Sheet",
-                labels={"Timestamp": "시간", column: column},
-                title=f"{column} (시트별 구분)", height=350
-            )
+        # --- Time-Series Plots ---
+        st.subheader("📊 시간별 바 시각화 (컬럼별)")
+        for col in ["Quantity", "RR_RH_1", "RR_RH_2"]:
+            fig = px.bar(df_all, x="Timestamp", y=col, color="Sheet", height=350,
+                         title=f"{col} (시트별 구분)", labels={"Timestamp": "시간", col: col})
             fig.update_layout(
                 xaxis_tickangle=90,
                 xaxis_tickfont=dict(size=10),
-                yaxis_title=column,
                 margin=dict(l=40, r=20, t=50, b=120),
-                legend_title="시트",
                 font=dict(family="Nanum Gothic" if HANGUL_FONT else None)
             )
             st.plotly_chart(fig, use_container_width=True)
 
-        # --- Correlation Matrix (Pearson) ---
-        st.subheader("🔗 상관관계 분석 (전체 통합)")
-        numeric_cols = ["Quantity", "RR_RH_1", "RR_RH_2"]
-        corr = df_all[numeric_cols].corr(method="pearson").round(3)
-
+        # --- Correlation Heatmap ---
+        st.subheader("🔗 상관관계 분석")
+        corr = df_all[["Quantity", "RR_RH_1", "RR_RH_2"]].corr().round(3)
         fig = go.Figure(data=go.Heatmap(
             z=corr.values,
             x=corr.columns,
@@ -107,54 +99,75 @@ if uploaded_file:
             texttemplate="%{text}",
             hoverinfo="text"
         ))
-        fig.update_layout(
-            title="📌 Pearson 상관계수 히트맵",
-            font=dict(family="Nanum Gothic" if HANGUL_FONT else None),
-            height=400
-        )
+        fig.update_layout(title="📌 Pearson 상관계수", font=dict(family="Nanum Gothic" if HANGUL_FONT else None))
         st.plotly_chart(fig, use_container_width=True)
 
         # --- Cross Correlation ---
-        st.subheader("⏱️ 시차 기반 상관관계 분석 (Cross Correlation)")
-        ref_col = st.selectbox("기준 컬럼 선택:", numeric_cols)
-        compare_col = st.selectbox("비교할 컬럼 선택:", [c for c in numeric_cols if c != ref_col])
-        max_lag = st.slider("최대 시차 범위 (row shift)", 1, 100, 20)
+        st.subheader("⏱️ Cross Correlation")
+        numeric_cols = ["Quantity", "RR_RH_1", "RR_RH_2"]
+        ref_col = st.sidebar.selectbox("기준 컬럼 선택:", numeric_cols)
+        compare_col = st.sidebar.selectbox("비교할 컬럼 선택:", [c for c in numeric_cols if c != ref_col])
+        max_lag = st.sidebar.slider("최대 시차 (lag)", 1, 100, 20)
 
         s1 = df_all[ref_col].dropna().reset_index(drop=True)
         s2 = df_all[compare_col].dropna().reset_index(drop=True)
         min_len = min(len(s1), len(s2))
-        s1 = s1[:min_len]
-        s2 = s2[:min_len]
+        s1, s2 = s1[:min_len], s2[:min_len]
 
         lags = list(range(-max_lag, max_lag + 1))
         xcorr = [s1.corr(s2.shift(lag)) for lag in lags]
 
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=lags, y=xcorr, mode="lines+markers", name="Cross Correlation"))
-        fig.update_layout(
-            title=f"📌 Cross Correlation: {ref_col} vs {compare_col}",
-            xaxis_title="시차 (Lag)",
-            yaxis_title="상관계수",
-            font=dict(family="Nanum Gothic" if HANGUL_FONT else None)
-        )
+        fig.add_trace(go.Scatter(x=lags, y=xcorr, mode="lines+markers", name="Cross Corr"))
+        fig.update_layout(title=f"Cross Correlation: {ref_col} vs {compare_col}",
+                          xaxis_title="시차 (Lag)", yaxis_title="상관계수",
+                          font=dict(family="Nanum Gothic" if HANGUL_FONT else None))
         st.plotly_chart(fig, use_container_width=True)
 
-        # --- Sheet Comparison by Aggregates ---
-        st.subheader("🧩 시트별 통계값 비교")
-        stat_option = st.selectbox("비교할 통계 항목:", ["mean", "std", "min", "max"])
-        sheet_stats = df_all.groupby("Sheet")[numeric_cols].agg(stat_option)
-
-        fig = px.bar(
-            sheet_stats.reset_index().melt(id_vars="Sheet"),
-            x="Sheet", y="value", color="variable", barmode="group",
-            title=f"{stat_option.upper()} 값 시트별 비교",
-            labels={"value": "값", "variable": "컬럼"},
-            height=400
-        )
+        # --- Scatter Plot of RR_RH-1 vs RR_RH-2 ---
+        st.subheader("🧪 RR_RH-1 vs RR_RH-2 산점도")
+        fig = px.scatter(df_all, x="RR_RH_1", y="RR_RH_2", color="Sheet", opacity=0.7,
+                         title="RR_RH-1 vs RR_RH-2", labels={"RR_RH_1": "RR_RH-1", "RR_RH_2": "RR_RH-2"})
         fig.update_layout(font=dict(family="Nanum Gothic" if HANGUL_FONT else None))
         st.plotly_chart(fig, use_container_width=True)
 
-        # --- Missing Value Heatmap (Table) ---
-        st.subheader("🕳️ 결측값 개요 (Missing Value Overview)")
-        missing_counts = df_all.groupby("Sheet")[numeric_cols].apply(lambda x: x.isna().sum()).reset_index()
-        st.dataframe(missing_counts)
+        # --- Delta Plot (RR_RH-1 - RR_RH-2) ---
+        st.subheader("📉 RR_RH-1 - RR_RH-2 차이")
+        df_all["Delta"] = df_all["RR_RH_1"] - df_all["RR_RH_2"]
+        fig = px.bar(df_all, x="Timestamp", y="Delta", color="Sheet", title="Delta: RR_RH-1 - RR_RH-2",
+                     labels={"Timestamp": "시간", "Delta": "차이"})
+        fig.update_layout(xaxis_tickangle=90, font=dict(family="Nanum Gothic" if HANGUL_FONT else None))
+        st.plotly_chart(fig, use_container_width=True)
+
+        # --- Rolling Mean and Rate of Change ---
+        st.subheader("🔄 이동 평균 및 변화율")
+        window = st.sidebar.slider("이동 평균 윈도우 (row 수)", 1, 20, 5)
+        for col in ["RR_RH_1", "RR_RH_2"]:
+            df_all[f"{col}_roll"] = df_all[col].rolling(window=window).mean()
+            df_all[f"{col}_diff"] = df_all[col].diff()
+
+            st.markdown(f"**{col} - 이동 평균**")
+            fig = px.line(df_all, x="Timestamp", y=f"{col}_roll", color="Sheet", labels={"value": "값"})
+            fig.update_layout(xaxis_tickangle=90, font=dict(family="Nanum Gothic" if HANGUL_FONT else None))
+            st.plotly_chart(fig, use_container_width=True)
+
+            st.markdown(f"**{col} - 변화율 (diff)**")
+            fig = px.line(df_all, x="Timestamp", y=f"{col}_diff", color="Sheet", labels={"value": "값"})
+            fig.update_layout(xaxis_tickangle=90, font=dict(family="Nanum Gothic" if HANGUL_FONT else None))
+            st.plotly_chart(fig, use_container_width=True)
+
+        # --- Missing Value Patterns ---
+        st.subheader("🕳️ 결측 패턴 시각화")
+        nan_df = df_all[["Timestamp", "Sheet", "RR_RH_1", "RR_RH_2"]].copy()
+        nan_df["RR_RH_1_missing"] = nan_df["RR_RH_1"].isna().astype(int)
+        nan_df["RR_RH_2_missing"] = nan_df["RR_RH_2"].isna().astype(int)
+
+        fig = px.bar(nan_df, x="Timestamp", y="RR_RH_1_missing", color="Sheet", title="RR_RH-1 결측 여부",
+                     labels={"RR_RH_1_missing": "결측(1=결측)", "Timestamp": "시간"})
+        fig.update_layout(xaxis_tickangle=90, font=dict(family="Nanum Gothic" if HANGUL_FONT else None))
+        st.plotly_chart(fig, use_container_width=True)
+
+        fig = px.bar(nan_df, x="Timestamp", y="RR_RH_2_missing", color="Sheet", title="RR_RH-2 결측 여부",
+                     labels={"RR_RH_2_missing": "결측(1=결측)", "Timestamp": "시간"})
+        fig.update_layout(xaxis_tickangle=90, font=dict(family="Nanum Gothic" if HANGUL_FONT else None))
+        st.plotly_chart(fig, use_container_width=True)
