@@ -82,8 +82,6 @@ df_all["Sensor1_per_unit"] = df_all["Sensor1"] / df_all["Quantity"].replace(0, n
 df_all["Sensor2_per_unit"] = df_all["Sensor2"] / df_all["Quantity"].replace(0, np.nan)
 df_all["Delta"] = df_all["Sensor1"] - df_all["Sensor2"]
 
-
-
         # ──────────────────────────────────────────────
         # 📌 Data Summary
         st.markdown("## 📌 데이터 요약<br><span style='color:gray'>Data Summary</span>", unsafe_allow_html=True)
