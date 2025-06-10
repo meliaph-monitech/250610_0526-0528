@@ -216,6 +216,11 @@ if uploaded_file:
         
         # Global Diagnostics
         st.markdown("#### 🌐 전체 지표<br><span style='color:gray'>Global Diagnostic Metrics</span>", unsafe_allow_html=True)
+        st.caption("""
+                    - **SEE1 / SEE2**: Total Sensor1 or Sensor2 signal sum divided by total production count. Higher values suggest stronger average signals per weld.
+                    - **Transition Rate**: Frequency of switching between production and idle intervals, indicating line stability.
+                    - **SPWD1 / SPWD2**: Standard deviation to mean ratio of per-unit sensor signals. Lower values suggest more consistent quality or sensor readings.
+                    """)
         total_rows = len(df_all)
         global_metrics = {
             "SEE1 (Sensor1 Energy per Unit)": df_all["Sensor1"].sum() / df_all["Quantity"].sum(),
@@ -228,6 +233,11 @@ if uploaded_file:
         
         # Per-sheet Metrics in Expander
         with st.expander("📂 시트별 진단 지표 보기\n\nView Diagnostic Metrics per Sheet"):
+            st.caption("""
+                        - **SEE1/SEE2**: Measures average sensor energy use per weld on a daily basis.
+                        - **Transition Rate**: Tracks how often the sheet alternates between zero and non-zero production.
+                        - **SPWD1/2**: Sensor consistency indicators; lower values suggest more stable operation.
+                        """)
             diagnostics = []
             for sheet in selected_sheets:
                 subset = df_all[df_all["Sheet"] == sheet]
@@ -252,6 +262,10 @@ if uploaded_file:
         
             # Radar Chart (mean-normalized)
             st.markdown("### 🕸️ 시트별 종합 진단 레이더<br><span style='color:gray'>Radar Chart of Sheet Diagnostics</span>", unsafe_allow_html=True)
+            st.caption("""
+                        This radar chart visualizes how each sheet compares to the global average across all diagnostic metrics. 
+                        Each axis is normalized (1.0 = global mean), allowing quick comparison of operational characteristics.
+                        """)
             radar_df = df_diag.copy()
             metrics = ["SEE1", "SEE2", "Transition Rate", "SPWD1", "SPWD2"]
             radar_df_norm = radar_df.copy()
@@ -278,6 +292,10 @@ if uploaded_file:
         
             # Heatmap of diagnostics
             st.markdown("### 🔥 진단 지표 히트맵<br><span style='color:gray'>Heatmap of Diagnostic Metrics</span>", unsafe_allow_html=True)
+            st.caption("""
+                        Color-coded comparison of all sheets across the five diagnostic metrics.
+                        This visual is helpful for quickly identifying anomalies or outliers in sensor behavior or production dynamics.
+                        """)
             fig = px.imshow(df_diag.set_index("Sheet")[metrics].round(4),
                             text_auto=True,
                             color_continuous_scale="Viridis",
