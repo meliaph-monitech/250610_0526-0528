@@ -21,7 +21,7 @@ if uploaded_file:
             df = pd.read_excel(xls, sheet_name=sheet)
             df = df.rename(columns={df.columns[0]: "Timestamp", df.columns[1]: "Quantity",
                                     df.columns[2]: "RR_RH_1", df.columns[3]: "RR_RH_2"})
-            df["Timestamp"] = pd.to_datetime(df["Timestamp"])
+            df["Timestamp"] = pd.to_datetime(df["Timestamp"], errors="coerce")
             df["Sheet"] = sheet
             data_frames.append(df)
 
