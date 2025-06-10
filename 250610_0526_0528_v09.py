@@ -127,7 +127,7 @@ if uploaded_file:
                 st.plotly_chart(fig, use_container_width=True)
         
         # --- Exploratory Data Analysis
-        with st.expander("🔍 Exploratory Data Analysis"):
+        with st.expander("🔍 Exploratory Data Analysis", expanded=True):
             # --- Sensor per Unit vs Quantity
             st.markdown("## 📉 생산량 대비 단위당 센서 평균값<br><span style='color:gray'>Sensor Signal per Unit vs Quantity</span>", unsafe_allow_html=True)
             for col in ["Sensor1_per_unit", "Sensor2_per_unit"]:
