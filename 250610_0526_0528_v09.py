@@ -33,22 +33,22 @@ def format_excel_time(t):
 st.sidebar.header("🧭 대시보드 설정\n\nSensor Data Dashboard Settings")
 uploaded_file = st.sidebar.file_uploader("엑셀 파일 업로드 (.xlsx)\n\nUpload Excel File", type=["xlsx"])
 
-# Determine data source
-if uploaded_file:
+# Determine source: user upload OR default URL
+if uploaded_file is not None:
     xls = pd.ExcelFile(uploaded_file)
     st.sidebar.success("사용자 업로드 데이터를 사용 중입니다.\n\nUsing user-uploaded data.")
 else:
-    default_path = "https://raw.githubusercontent.com/meliaph-monitech/250610_0526-0528/main/250610_sampledata.xlsx"
+    default_url = "https://raw.githubusercontent.com/meliaph-monitech/250610_0526-0528/main/250610_sampledata.xlsx"
     try:
-        response = requests.get(default_path)
+        response = requests.get(default_url)
         response.raise_for_status()
         xls = pd.ExcelFile(BytesIO(response.content))
         st.sidebar.info("기본 샘플 데이터를 사용 중입니다.\n\nUsing default sample data.")
     except Exception as e:
-        st.error(f"기본 샘플 파일을 불러오지 못했습니다: {e}\n\nCould not load default sample file. Please upload an Excel file.")
+        st.error(f"기본 샘플 파일을 불러올 수 없습니다.\n\nCould not load default sample file.\n\nError: {e}")
         st.stop()
 
-# Sheet selection
+# Proceed only if xls was successfully defined
 all_sheets = xls.sheet_names
 selected_sheets = st.sidebar.multiselect("시트 선택:\n\nSelect Sheets", all_sheets, default=all_sheets[:3])
 
