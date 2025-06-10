@@ -52,31 +52,36 @@ else:
 all_sheets = xls.sheet_names
 selected_sheets = st.sidebar.multiselect("시트 선택:\n\nSelect Sheets", all_sheets, default=all_sheets[:3])
 
-if selected_sheets:
-    dfs = []
-    for sheet in selected_sheets:
-        df = pd.read_excel(xls, sheet_name=sheet)
-        df = df.rename(columns={
-            df.columns[0]: "Timestamp",
-            df.columns[1]: "Quantity",
-            df.columns[2]: "Sensor1",
-            df.columns[3]: "Sensor2"
-        })
-        df["Timestamp"] = df["Timestamp"].apply(format_excel_time)
-        df["Sheet"] = sheet
-        df["Date"] = sheet[:4]
-        df["SensorType"] = sheet.split("_")[-1]
-        df["TimeKey"] = df["Sheet"] + "_" + df["Timestamp"]
-        dfs.append(df)
+if not selected_sheets:
+    st.warning("최소 한 개의 시트를 선택해주세요.\n\nPlease select at least one sheet.")
+    st.stop()
 
-    df_all = pd.concat(dfs, ignore_index=True)
-    df_all.dropna(subset=["Timestamp"], inplace=True)
-    df_all.fillna(0, inplace=True)
+# Proceed with processing
+dfs = []
+for sheet in selected_sheets:
+    df = pd.read_excel(xls, sheet_name=sheet)
+    df = df.rename(columns={
+        df.columns[0]: "Timestamp",
+        df.columns[1]: "Quantity",
+        df.columns[2]: "Sensor1",
+        df.columns[3]: "Sensor2"
+    })
+    df["Timestamp"] = df["Timestamp"].apply(format_excel_time)
+    df["Sheet"] = sheet
+    df["Date"] = sheet[:4]
+    df["SensorType"] = sheet.split("_")[-1]
+    df["TimeKey"] = df["Sheet"] + "_" + df["Timestamp"]
+    dfs.append(df)
 
-    # Feature engineering
-    df_all["Sensor1_per_unit"] = df_all["Sensor1"] / df_all["Quantity"].replace(0, np.nan)
-    df_all["Sensor2_per_unit"] = df_all["Sensor2"] / df_all["Quantity"].replace(0, np.nan)
-    df_all["Delta"] = df_all["Sensor1"] - df_all["Sensor2"]
+df_all = pd.concat(dfs, ignore_index=True)
+df_all.dropna(subset=["Timestamp"], inplace=True)
+df_all.fillna(0, inplace=True)
+
+# Feature engineering
+df_all["Sensor1_per_unit"] = df_all["Sensor1"] / df_all["Quantity"].replace(0, np.nan)
+df_all["Sensor2_per_unit"] = df_all["Sensor2"] / df_all["Quantity"].replace(0, np.nan)
+df_all["Delta"] = df_all["Sensor1"] - df_all["Sensor2"]
+
 
 
         # ──────────────────────────────────────────────
