@@ -67,7 +67,8 @@ if uploaded_file:
         st.markdown("## 📌 데이터 요약<br><span style='color:gray'>Data Summary</span>", unsafe_allow_html=True)
         st.metric("전체 생산수량", int(df_all["Quantity"].sum()))
         st.metric("총 시트 개수", len(selected_sheets))
-        st.dataframe(df_all.head(10))
+        with st.expander()
+            st.dataframe(df_all.head(10))
 
         # ──────────────────────────────────────────────
         # ⏱️ Sensor/Quantity Over Time
