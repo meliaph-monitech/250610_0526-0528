@@ -1,3 +1,5 @@
+import requests
+from io import BytesIO
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -38,10 +40,12 @@ if uploaded_file:
 else:
     default_path = "https://raw.githubusercontent.com/meliaph-monitech/250610_0526-0528/main/250610_sampledata.xlsx"
     try:
-        xls = pd.ExcelFile(default_path)
+        response = requests.get(default_path)
+        response.raise_for_status()
+        xls = pd.ExcelFile(BytesIO(response.content))
         st.sidebar.info("기본 샘플 데이터를 사용 중입니다.\n\nUsing default sample data.")
-    except FileNotFoundError:
-        st.error("기본 샘플 파일을 찾을 수 없습니다. 업로드해주세요.\n\nDefault sample file not found. Please upload an Excel file.")
+    except Exception as e:
+        st.error(f"기본 샘플 파일을 불러오지 못했습니다: {e}\n\nCould not load default sample file. Please upload an Excel file.")
         st.stop()
 
 # Sheet selection
