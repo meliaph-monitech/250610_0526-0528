@@ -20,7 +20,7 @@ if uploaded_file:
 
     if selected_sheets:
         data_dict = {}
-        all_times = None
+        all_times = []
 
         for sheet in selected_sheets:
             df = pd.read_excel(uploaded_file, sheet_name=sheet)
@@ -29,13 +29,10 @@ if uploaded_file:
             df = df.sort_values('시간').reset_index(drop=True)
             df = df[df['생산수량'] > 0]  # filter valid rows for RR RH values
             data_dict[sheet] = df
-            if all_times is None:
-                all_times = df['시간']
-            else:
-                all_times = all_times.append(df['시간'])
+            all_times.extend(df['시간'].tolist())
 
         # Create unified timeline
-        unified_time = pd.Series(sorted(all_times.unique()))
+        unified_time = pd.Series(sorted(pd.Series(all_times).unique()))
 
         # Align data to unified time index
         aligned_data = []
