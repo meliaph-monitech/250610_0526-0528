@@ -149,11 +149,13 @@ if uploaded_file:
             st.markdown(f"**{col} - 이동 평균**")
             fig = px.line(df_all, x="Timestamp", y=f"{col}_roll", color="Sheet", labels={"value": "값"})
             fig.update_layout(xaxis_tickangle=90, font=dict(family="Nanum Gothic" if HANGUL_FONT else None))
+            fig.update_traces(connectgaps=False)
             st.plotly_chart(fig, use_container_width=True)
 
             st.markdown(f"**{col} - 변화율 (diff)**")
             fig = px.line(df_all, x="Timestamp", y=f"{col}_diff", color="Sheet", labels={"value": "값"})
             fig.update_layout(xaxis_tickangle=90, font=dict(family="Nanum Gothic" if HANGUL_FONT else None))
+            fig.update_traces(connectgaps=False)
             st.plotly_chart(fig, use_container_width=True)
 
         # --- Missing Value Patterns ---
