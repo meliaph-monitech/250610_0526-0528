@@ -1,5 +1,3 @@
-import requests
-from io import BytesIO
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -33,58 +31,36 @@ def format_excel_time(t):
 st.sidebar.header("🧭 대시보드 설정\n\nSensor Data Dashboard Settings")
 uploaded_file = st.sidebar.file_uploader("엑셀 파일 업로드 (.xlsx)\n\nUpload Excel File", type=["xlsx"])
 
-use_sample = st.sidebar.button("📂 샘플 데이터 사용\n\nUse Sample Data")
-
-# Load Excel file (uploaded or sample)
-xls = None
-
-if uploaded_file is not None:
+if uploaded_file:
     xls = pd.ExcelFile(uploaded_file)
-    st.sidebar.success("✅ 사용자 업로드 데이터를 사용 중입니다.\n\nUsing user-uploaded data.")
-elif use_sample:
-    try:
-        default_url = "https://raw.githubusercontent.com/meliaph-monitech/250610_0526-0528/main/250610_sampledata.xlsx"
-        response = requests.get(default_url)
-        response.raise_for_status()
-        xls = pd.ExcelFile(BytesIO(response.content))
-        st.sidebar.info("📁 샘플 데이터를 사용 중입니다.\n\nUsing default sample data.")
-    except Exception as e:
-        st.error(f"❌ 샘플 파일을 불러올 수 없습니다.\n\nCould not load sample data.\n\nError: {e}")
-        st.stop()
-else:
-    st.warning("📤 엑셀 파일을 업로드하거나 샘플 데이터를 선택해주세요.\n\nPlease upload an Excel file or use the sample data.")
-    st.stop()
+    all_sheets = xls.sheet_names
+    selected_sheets = st.sidebar.multiselect("시트 선택:\n\nSelect Sheets", all_sheets, default=all_sheets[:3])
 
-# Proceed only if xls was successfully defined
-all_sheets = xls.sheet_names
-selected_sheets = st.sidebar.multiselect("시트 선택:\n\nSelect Sheets", all_sheets, default=all_sheets[:3])
+    if selected_sheets:
+        dfs = []
+        for sheet in selected_sheets:
+            df = pd.read_excel(xls, sheet_name=sheet)
+            df = df.rename(columns={
+                df.columns[0]: "Timestamp",
+                df.columns[1]: "Quantity",
+                df.columns[2]: "Sensor1",
+                df.columns[3]: "Sensor2"
+            })
+            df["Timestamp"] = df["Timestamp"].apply(format_excel_time)
+            df["Sheet"] = sheet
+            df["Date"] = sheet[:4]
+            df["SensorType"] = sheet.split("_")[-1]
+            df["TimeKey"] = df["Sheet"] + "_" + df["Timestamp"]
+            dfs.append(df)
 
-if selected_sheets:
-    dfs = []
-    for sheet in selected_sheets:
-        df = pd.read_excel(xls, sheet_name=sheet)
-        df = df.rename(columns={
-            df.columns[0]: "Timestamp",
-            df.columns[1]: "Quantity",
-            df.columns[2]: "Sensor1",
-            df.columns[3]: "Sensor2"
-        })
-        df["Timestamp"] = df["Timestamp"].apply(format_excel_time)
-        df["Sheet"] = sheet
-        df["Date"] = sheet[:4]
-        df["SensorType"] = sheet.split("_")[-1]
-        df["TimeKey"] = df["Sheet"] + "_" + df["Timestamp"]
-        dfs.append(df)
+        df_all = pd.concat(dfs, ignore_index=True)
+        df_all.dropna(subset=["Timestamp"], inplace=True)
+        df_all.fillna(0, inplace=True)
 
-    df_all = pd.concat(dfs, ignore_index=True)
-    df_all.dropna(subset=["Timestamp"], inplace=True)
-    df_all.fillna(0, inplace=True)
-
-    # Feature engineering
-    df_all["Sensor1_per_unit"] = df_all["Sensor1"] / df_all["Quantity"].replace(0, np.nan)
-    df_all["Sensor2_per_unit"] = df_all["Sensor2"] / df_all["Quantity"].replace(0, np.nan)
-    df_all["Delta"] = df_all["Sensor1"] - df_all["Sensor2"]
-
+        # Feature engineering
+        df_all["Sensor1_per_unit"] = df_all["Sensor1"] / df_all["Quantity"].replace(0, np.nan)
+        df_all["Sensor2_per_unit"] = df_all["Sensor2"] / df_all["Quantity"].replace(0, np.nan)
+        df_all["Delta"] = df_all["Sensor1"] - df_all["Sensor2"]
 
         # ──────────────────────────────────────────────
         # 📌 Data Summary
