@@ -132,10 +132,11 @@ if uploaded_file:
             # --- Sensor per Unit vs Quantity
             st.markdown("## 📉 생산량 대비 단위당 센서 평균값<br><span style='color:gray'>Sensor Signal per Unit vs Quantity</span>", unsafe_allow_html=True)
             for col in ["Sensor1_per_unit", "Sensor2_per_unit"]:
-                fig = px.scatter(df_all, x="Quantity", y=col, color="Sheet", trendline="lowess",
+                fig = px.scatter(df_all, x="Quantity", y=col, color="Sheet",
                                  title=f"{col} vs Quantity<br><span style='color:gray'>{col} vs Quantity</span>",
                                  labels={"Quantity": "생산량<br><span style='color:gray'>Quantity</span>",
                                          col: "단위당 평균<br><span style='color:gray'>Per-Unit Average</span>"})
+
                 fig.update_layout(font=dict(family="Nanum Gothic" if HANGUL_FONT else None))
                 st.plotly_chart(fig, use_container_width=True)
         
